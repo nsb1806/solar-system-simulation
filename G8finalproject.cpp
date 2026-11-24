@@ -72,6 +72,9 @@ bool isPaused = false;
 float simSpeed = 1.0f;
 int selectedBodyIdx = -1; // -1 none, 0 SUN, 1..8 planets[0..7]
 
+// --- Star VBO data ---
+const int NUM_STARS = 1500;
+GLuint starVBO = 0;
 /* ------------------------------------------------------------
                     Function Prototypes
 ------------------------------------------------------------*/
@@ -148,8 +151,42 @@ void init()
     reshape(800, 600);
 }
 
+// Generates random star positions and colors, uploads them to a GPU buffer
 void initStarVBO()
 {
+    // Array storing 6 floats per star: x, y, z, r, g, b
+    GLfloat data[NUM_STARS * 6];
+
+    for (int i = 0; i < NUM_STARS; ++i)
+    {
+        float x, y, z, distSq;
+
+        // Pick random points in a big box until one lands 50-70 units from the center
+        do
+        {
+            x = (rand() % 1401 - 700) / 10.0f; // -70.0 to 70.0
+            y = (rand() % 1401 - 700) / 10.0f;
+            z = (rand() % 1401 - 700) / 10.0f;
+            distSq = x * x + y * y + z * z;
+        } while (distSq < 50.0f * 50.0f || distSq > 70.0f * 70.0f);
+        
+        // Generate a base brightness between 0.5 and 1.0
+        float brightness = 0.5f + (rand() % 51) / 100.0f; 
+
+        // Store the 3D position 
+        data[i * 6 + 0] = x;
+        data[i * 6 + 1] = y;
+        data[i * 6 + 2] = z;
+        // Store the color with slight random variation in tints
+        data[i * 6 + 3] = brightness * (0.80f + (rand() % 21) / 100.0f); // Red
+        data[i * 6 + 4] = brightness * (0.80f + (rand() % 21) / 100.0f); // Green
+        data[i * 6 + 5] = brightness * (0.80f + (rand() % 21) / 100.0f); // Blue
+    }
+
+    glGenBuffers(1, &starVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, starVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(data), data, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 /* ------------------------------------------------------------
@@ -188,10 +225,68 @@ void drawPlanets()
 
 void drawRings()
 {
+    glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_LIGHTING_BIT);
+    glDisable(GL_TEXTURE_2D); 
+    glEnable(GL_NORMALIZE);   
+
+    for (int i = 0; i < NUM_PLANETS; ++i)
+    {
+        if (!planets[i].hasRings)
+            continue;
+        // Ring's thickness and middle radius converted from its inner and outer edges
+        GLfloat tubeRadius = (planets[i].ringOuter - planets[i].ringInner) / 2.0f;
+        GLfloat ringRadius = (planets[i].ringOuter + planets[i].ringInner) / 2.0f;
+
+        // Axial tilt: Saturn (~27°) vs. Uranus (~82°)
+        GLfloat tilt = (i == 5) ? 27.0f : 82.0f;
+
+        // slightly lighter version of the planet's color
+        GLfloat c[3] = {
+            planets[i].color[0] * 0.9f + 0.1f,
+            planets[i].color[1] * 0.9f + 0.1f,
+            planets[i].color[2] * 0.9f + 0.1f};
+
+        glColor3fv(c);
+        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, c);
+
+        glPushMatrix();
+        glRotatef(planets[i].orbitAngle, 0.0f, 1.0f, 0.0f); // follow the planet's orbit
+        glTranslatef(planets[i].orbitRadius, 0.0f, 0.0f);
+        glRotatef(-planets[i].orbitAngle, 0.0f, 1.0f, 0.0f); // keep the tilt fixed in space
+        glRotatef(tilt, 0.0f, 0.0f, 1.0f);                   
+        glRotatef(90.0f, 1.0f, 0.0f, 0.0f);                  // lay the torus flat
+        glScalef(1.0f, 1.0f, 0.08f);                         
+        glutSolidTorus(tubeRadius, ringRadius, 24, 64);
+        glPopMatrix();
+    }
+
+    glPopAttrib();
 }
 
 void drawStars()
 {
+    glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_POINT_BIT);
+    glDisable(GL_LIGHTING);   // Disabled because stars shine on their own
+    glDisable(GL_TEXTURE_2D);
+    glPointSize(1.8f);
+
+    glBindBuffer(GL_ARRAY_BUFFER, starVBO);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_COLOR_ARRAY);
+
+    // Each star takes 6 floats in the buffer: [x, y, z, r, g, b]
+    GLsizei stride = 6 * sizeof(GLfloat);
+    glVertexPointer(3, GL_FLOAT, stride, BUFFER_OFFSET(0));
+    glColorPointer(3, GL_FLOAT, stride, BUFFER_OFFSET(3 * sizeof(GLfloat)));
+
+    // Draw every star as a single point
+    glDrawArrays(GL_POINTS, 0, NUM_STARS);
+
+    glDisableClientState(GL_COLOR_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glPopAttrib();
 }
 
 /* ------------------------------------------------------------
