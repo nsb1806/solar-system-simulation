@@ -72,6 +72,10 @@ bool isPaused = false;
 float simSpeed = 1.0f;
 int selectedBodyIdx = -1; // -1 none, 0 SUN, 1..8 planets[0..7]
 
+// Store the current window dimensions for the 2D overlay and reshape function.
+int windowWidth = 800;
+int windowHeight = 600;
+
 // --- Star VBO data ---
 const int NUM_STARS = 1500;
 GLuint starVBO = 0;
@@ -319,10 +323,79 @@ void setPlanetMaterial(GLfloat r, GLfloat g, GLfloat b, GLfloat emission)
 ------------------------------------------------------------*/
 void drawBitmapText(float x, float y, const char *text)
 {
+    glRasterPos2f(x, y);
+    for (const char *character = text; *character != '\0'; ++character)
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *character);
 }
 
 void draw2DTextOverlay()
 {
+    // Save the 3D rendering state before switching to screen-space drawing.
+    glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_CURRENT_BIT);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_LIGHTING);
+    glDisable(GL_TEXTURE_2D);
+
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    gluOrtho2D(0.0, static_cast<GLdouble>(windowWidth),
+               0.0, static_cast<GLdouble>(windowHeight));
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    const char *selectedName = "None";
+    const char *selectedNickname = "Press 1-9 to select a body";
+
+    if (selectedBodyIdx == 0)
+    {
+        selectedName = sunName;
+        selectedNickname = sunNickname;
+    }
+    else if (selectedBodyIdx > 0 && selectedBodyIdx <= NUM_PLANETS)
+    {
+        selectedName = planets[selectedBodyIdx - 1].name;
+        selectedNickname = planets[selectedBodyIdx - 1].nickname;
+    }
+
+    char selectedLine[128];
+    snprintf(selectedLine, sizeof(selectedLine), "%s - %s",
+             selectedName, selectedNickname);
+
+    char statusLine[80];
+    snprintf(statusLine, sizeof(statusLine), "Simulation: %s | Speed: %.1fx",
+             isPaused ? "PAUSED" : "RUNNING", simSpeed);
+
+    const char *controlsLine = "Space: Pause/Resume   R: Reset   1-9: Select   Esc: Exit";
+    const float rightMargin = 15.0f;
+
+    int selectedWidth = 0;
+    for (const char *character = selectedLine; *character != '\0'; ++character)
+        selectedWidth += glutBitmapWidth(GLUT_BITMAP_HELVETICA_12, *character);
+
+    int statusWidth = 0;
+    for (const char *character = statusLine; *character != '\0'; ++character)
+        statusWidth += glutBitmapWidth(GLUT_BITMAP_HELVETICA_12, *character);
+
+    int controlsWidth = 0;
+    for (const char *character = controlsLine; *character != '\0'; ++character)
+        controlsWidth += glutBitmapWidth(GLUT_BITMAP_HELVETICA_12, *character);
+
+    glColor3f(1.0f, 1.0f, 1.0f);
+    drawBitmapText(windowWidth - selectedWidth - rightMargin,
+                   48.0f, selectedLine);
+    drawBitmapText(windowWidth - statusWidth - rightMargin,
+                   30.0f, statusLine);
+    drawBitmapText(windowWidth - controlsWidth - rightMargin,
+                   12.0f, controlsLine);
+
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    glPopAttrib();
 }
 
 /* ------------------------------------------------------------
@@ -353,6 +426,20 @@ void display()
 ------------------------------------------------------------*/
 void reshape(int width, int height)
 {
+    // Update the viewport and perspective projection whenever the window is
+    // resized, preventing the solar system from being stretched.
+    windowWidth = (width > 0) ? width : 1;
+    windowHeight = (height > 0) ? height : 1;
+
+    glViewport(0, 0, windowWidth, windowHeight);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(45.0,
+                   static_cast<GLdouble>(windowWidth) /
+                       static_cast<GLdouble>(windowHeight),
+                   0.1, 200.0);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
 }
 
 void timer(int value)
@@ -389,6 +476,45 @@ void timer(int value)
 ------------------------------------------------------------*/
 void keyboard(unsigned char key, int x, int y)
 {
+    (void)x;
+    (void)y;
+
+    // Handle simulation controls and body selection from keyboard input.
+    switch (key)
+    {
+    case ' ':
+        isPaused = !isPaused;
+        break;
+
+    case 'r':
+    case 'R':
+        resetSimulation();
+        break;
+
+    case '1':
+        selectedBodyIdx = 0; // Sun
+        break;
+
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+        selectedBodyIdx = key - '1';
+        break;
+
+    case 27: // Escape
+        exit(0);
+        break;
+
+    default:
+        return;
+    }
+
+    glutPostRedisplay();
 }
 
 /* ------------------------------------------------------------
