@@ -69,10 +69,8 @@ An interactive 3D Solar System Simulation built in C++ using OpenGL
 
 - Points (Stars)
 
-## Member 5 deliverables
+## Member 5 integration notes
 
-- [Documentation Part I](docs/Part_I_Cypress.md)
-- [Video presentation script](docs/Video_Presentation_Script.md)
 - [Integration notes and verification](docs/Member_5_Integration_and_Testing.md)
 
-Part I and the script are editable Markdown documents that can be copied into the group's final document. Part II remains Member 4's contribution.
+The formal Part I documentation and group video script are maintained in the group's shared Google Doc. Member 4 maintains Part II there.

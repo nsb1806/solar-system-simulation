@@ -67,4 +67,4 @@ These are pending manual checks, not claimed test results:
 
 ## Document handoff
 
-`Part_I_Cypress.md` contains the first part of the project documentation. `Video_Presentation_Script.md` contains the full group script and a shorter Cypress-only recording option. The repository has no instructor-provided Part I/II outline; check the headings against any separate class template before combining them with Member 4's Part II.
+The formal Part I documentation and the group video presentation script are maintained in the group's shared Google Doc. These repository notes are for code review and verification. Member 4 maintains Part II in the same shared document.
