@@ -15,6 +15,8 @@
 
 #include <iostream>
 #include <cstdint>
+#include <algorithm>
+#include <cmath>
 #include <GL/glew.h>
 #include <GL/glut.h>
 #include <GL/freeglut_ext.h>
@@ -72,6 +74,16 @@ bool isPaused = false;
 float simSpeed = 1.0f;
 int selectedBodyIdx = -1; // -1 none, 0 SUN, 1..8 planets[0..7]
 
+// Member 5: mouse controls share simSpeed with Member 1's timer.
+const float MIN_SIM_SPEED = 0.25f;
+const float MAX_SIM_SPEED = 5.0f;
+const float SIM_SPEED_STEP = 0.25f;
+const float DEFAULT_CAMERA_DISTANCE = std::sqrt(12.0f * 12.0f + 24.0f * 24.0f);
+const float MAX_CAMERA_DISTANCE = 80.0f;
+float cameraDistance = DEFAULT_CAMERA_DISTANCE;
+bool isZoomDragging = false;
+int lastMouseY = 0;
+
 // Store the current window dimensions for the 2D overlay and reshape function.
 int windowWidth = 800;
 int windowHeight = 600;
@@ -89,6 +101,12 @@ void reshape(int width, int height);
 void timer(int value);
 void keyboard(unsigned char key, int x, int y);
 void mouse(int button, int state, int x, int y);
+void motion(int x, int y);
+void mouseWheel(int wheel, int direction, int x, int y);
+float minimumCameraDistance();
+void zoomCamera(float factor);
+void getCameraTarget(float &x, float &y, float &z);
+void applyCamera();
 
 void setLighting();
 void initStarVBO();
@@ -130,6 +148,8 @@ int main(int argc, char **argv)
     glutDisplayFunc(display);
     glutKeyboardFunc(keyboard);
     glutMouseFunc(mouse);
+    glutMotionFunc(motion);
+    glutMouseWheelFunc(mouseWheel); // FreeGLUT supplies wheel events separately.
     glutReshapeFunc(reshape);
     glutTimerFunc(16, timer, 0);
 
@@ -365,7 +385,7 @@ void draw2DTextOverlay()
              selectedName, selectedNickname);
 
     char statusLine[80];
-    snprintf(statusLine, sizeof(statusLine), "Simulation: %s | Speed: %.1fx",
+    snprintf(statusLine, sizeof(statusLine), "Simulation: %s | Speed: %.2fx",
              isPaused ? "PAUSED" : "RUNNING", simSpeed);
 
     const char *controlsLine = "Space: Pause/Resume   R: Reset   1-9: Select   Esc: Exit";
@@ -407,10 +427,7 @@ void display()
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    gluLookAt(
-        0.0f, 12.0f, 24.0f,
-        0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f);
+    applyCamera(); // Member 5: preserve the original viewing angle while zooming.
 
     drawSun();
     drawPlanets();
@@ -522,6 +539,103 @@ void keyboard(unsigned char key, int x, int y)
 ------------------------------------------------------------*/
 void mouse(int button, int state, int x, int y)
 {
+    (void)x;
+
+    // Middle drag is reserved for zoom so left/right clicks keep their
+    // README-defined speed controls. Button release must not change speed.
+    if (button == GLUT_MIDDLE_BUTTON)
+    {
+        isZoomDragging = (state == GLUT_DOWN);
+        lastMouseY = y;
+        return;
+    }
+
+    if (state != GLUT_DOWN)
+        return;
+
+    if (button == GLUT_LEFT_BUTTON)
+        simSpeed = std::max(MIN_SIM_SPEED, simSpeed - SIM_SPEED_STEP);
+    else if (button == GLUT_RIGHT_BUTTON)
+        simSpeed = std::min(MAX_SIM_SPEED, simSpeed + SIM_SPEED_STEP);
+    else
+        return;
+
+    // Updating speed while paused does not resume Member 1's timer.
+    glutPostRedisplay();
+}
+
+void motion(int x, int y)
+{
+    (void)x;
+    if (!isZoomDragging)
+        return;
+
+    // Drag up to move closer; drag down to move away. Limit a single event
+    // so a large pointer jump cannot overflow the exponential zoom factor.
+    const int deltaY = std::max(-100, std::min(100, y - lastMouseY));
+    lastMouseY = y;
+    zoomCamera(std::exp(static_cast<float>(deltaY) * 0.01f));
+}
+
+void mouseWheel(int wheel, int direction, int x, int y)
+{
+    (void)x;
+    (void)y;
+    if (wheel != 0 || direction == 0)
+        return;
+
+    zoomCamera(direction > 0 ? 0.9f : 1.0f / 0.9f);
+}
+
+float minimumCameraDistance()
+{
+    float extent = sunRadius;
+    if (selectedBodyIdx > 0 && selectedBodyIdx <= NUM_PLANETS)
+    {
+        const Planet &planet = planets[selectedBodyIdx - 1];
+        extent = planet.hasRings ? std::max(planet.radius, planet.ringOuter)
+                                : planet.radius;
+    }
+
+    // Keep the camera outside the selected sphere and its rings.
+    return std::max(1.5f, 3.0f * extent);
+}
+
+void zoomCamera(float factor)
+{
+    cameraDistance = std::max(minimumCameraDistance(),
+                             std::min(MAX_CAMERA_DISTANCE, cameraDistance * factor));
+    glutPostRedisplay();
+}
+
+void getCameraTarget(float &x, float &y, float &z)
+{
+    x = y = z = 0.0f; // No selection, or Sun selection: look at the origin.
+    if (selectedBodyIdx > 0 && selectedBodyIdx <= NUM_PLANETS)
+    {
+        const Planet &planet = planets[selectedBodyIdx - 1];
+        const float angle = planet.orbitAngle * 3.14159265358979323846f / 180.0f;
+
+        // Match Member 1's glRotatef(Y) then glTranslatef(orbitRadius, 0, 0).
+        // Recompute each frame so the camera follows the orbit without
+        // changing any planet's position, spin, or animation speed.
+        x = planet.orbitRadius * std::cos(angle);
+        z = -planet.orbitRadius * std::sin(angle);
+    }
+}
+
+void applyCamera()
+{
+    float targetX, targetY, targetZ;
+    getCameraTarget(targetX, targetY, targetZ);
+
+    // Recheck after keyboard selection, e.g. Mercury to the larger Sun.
+    cameraDistance = std::max(minimumCameraDistance(),
+                             std::min(MAX_CAMERA_DISTANCE, cameraDistance));
+    const float scale = cameraDistance / DEFAULT_CAMERA_DISTANCE;
+    gluLookAt(targetX, targetY + 12.0f * scale, targetZ + 24.0f * scale,
+              targetX, targetY, targetZ,
+              0.0f, 1.0f, 0.0f);
 }
 
 /* ------------------------------------------------------------
@@ -541,4 +655,7 @@ void resetSimulation()
     isPaused = false;    // Make sure the simulation is not paused.
     simSpeed = 1.0f;     // Reset the simulation speed to normal.
     selectedBodyIdx = -1;
+    cameraDistance = DEFAULT_CAMERA_DISTANCE;
+    isZoomDragging = false;
+    lastMouseY = 0;
 }
