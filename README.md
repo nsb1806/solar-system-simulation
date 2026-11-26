@@ -25,6 +25,10 @@ An interactive 3D Solar System Simulation built in C++ using OpenGL
 
 - Click Left Button to slow down the simulation speed.
 - Click Right Button to speed up the simulation speed.
+- Each click changes speed by 0.25x, limited to 0.25x–5.0x. Speed changes do not unpause the simulation.
+- Scroll up/down to zoom in/out, or hold the middle mouse button and drag up/down.
+- Press 1–9 to select and follow the Sun or a planet, then zoom to inspect it. With no selection, the camera looks at the Sun.
+- Press R to reset speed, selection, animation, zoom, and drag state to the starting view.
 
 ### 2D ELEMENTS:
 
@@ -64,3 +68,11 @@ An interactive 3D Solar System Simulation built in C++ using OpenGL
 ### VBO IMPLEMENTATION:
 
 - Points (Stars)
+
+## Member 5 deliverables
+
+- [Documentation Part I](docs/Part_I_Cypress.md)
+- [Video presentation script](docs/Video_Presentation_Script.md)
+- [Integration notes and verification](docs/Member_5_Integration_and_Testing.md)
+
+Part I and the script are editable Markdown documents that can be copied into the group's final document. Part II remains Member 4's contribution.
