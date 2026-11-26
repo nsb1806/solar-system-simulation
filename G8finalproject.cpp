@@ -14,6 +14,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 
 #include <iostream>
+#include <cmath>
 #include <cstdint>
 #include <GL/glew.h>
 #include <GL/glut.h>
@@ -95,10 +96,12 @@ void initStarVBO();
 void resetSimulation();
 
 void setPlanetMaterial(GLfloat r, GLfloat g, GLfloat b, GLfloat emission = 0.0f);
+void drawTexturedSphere(GLdouble radius, int slices, int stacks);
 void drawSun();
 void drawPlanets();
 void drawRings();
 void drawStars();
+void drawOrbits();
 void drawBitmapText(float x, float y, const char *text);
 void draw2DTextOverlay();
 
@@ -196,15 +199,50 @@ void initStarVBO()
 /* ------------------------------------------------------------
                     Object Drawing Functions
 ------------------------------------------------------------*/
+void drawTexturedSphere(GLdouble radius, int slices, int stacks) 
+{ 
+    GLUquadric *quad = gluNewQuadric(); 
+    gluQuadricTexture(quad, GL_TRUE); 
+    gluQuadricNormals(quad, GLU_SMOOTH); 
+    gluSphere(quad, radius, slices, stacks); 
+    gluDeleteQuadric(quad); 
+}
 
-void drawSun()
+    void drawSun()
 {
 
+    GLfloat glowIntensity = (selectedBodyIdx == 0) ? 1.35f : 0.95f; // Sun emits light when selected
     glPushMatrix();
-
     glRotatef(sunSpinAngle, 0.0f, 1.0f, 0.0f); // Spin the sun around its axis
-    glColor3fv(sunColor);                      // Set the sun's color
-    glutSolidSphere(sunRadius, 40, 40);        // Draw the sun as a solid sphere
+
+if (sunTextureID != 0)
+    {
+        setPlanetMaterial(1.0f, 0.90f, 0.65f, 0.35f * glowIntensity); // Sun emits light when selected
+        
+        GLfloat sunEmission[] = {
+            1.0f * glowIntensity, 
+            0.78f * glowIntensity, 
+            0.22f * glowIntensity, 
+            1.0f
+        };
+        glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, sunEmission);
+        
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, sunTextureID);
+        glColor3f(1.0f, 1.0f, 1.0f);  // Set the sun's color
+        drawTexturedSphere(sunRadius, 40, 40);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glDisable(GL_TEXTURE_2D);
+
+        GLfloat noEmission[] = {0.0f, 0.0f, 0.0f, 1.0f};
+        glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, noEmission); // Reset emission
+    }
+    else
+    {
+        setPlanetMaterial(sunColor[0], sunColor[1], sunColor[2], glowIntensity * 0.35f); // Sun emits light when selected
+        glColor3fv(sunColor);  // Set the sun's color
+        glutSolidSphere(sunRadius, 40, 40); // Draw the sun as a solid sphere
+    }       
 
     glPopMatrix();
 }
@@ -220,8 +258,24 @@ void drawPlanets()
         glTranslatef(planets[i].orbitRadius, 0.0f, 0.0f);   // Move the planet to its orbit radius from the sun
         glRotatef(planets[i].spinAngle, 0.0f, 1.0f, 0.0f);  // Spin the planet around its own axis
 
-        glColor3fv(planets[i].color);               // Set the planet's color
-        glutSolidSphere(planets[i].radius, 32, 32); // Draw the planet as a solid sphere
+        GLfloat glow = (selectedBodyIdx == i + 1) ? 0.55f : 0.0f; // Glow effect when selected
+
+        if (planets[i].textureID != 0)
+        {
+            setPlanetMaterial(1.0f, 1.0f, 1.0f, glow);
+            glEnable(GL_TEXTURE_2D);
+            glBindTexture(GL_TEXTURE_2D, planets[i].textureID);
+            glColor3f(1.0f, 1.0f, 1.0f); // Set the planet's color to white for texture rendering
+            drawTexturedSphere(planets[i].radius, 32, 32);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glDisable(GL_TEXTURE_2D);
+        }
+        else
+        {
+            setPlanetMaterial(planets[i].color[0], planets[i].color[1], planets[i].color[2], glow);
+            glColor3fv(planets[i].color);               // Set the planet's color
+            glutSolidSphere(planets[i].radius, 32, 32); // Draw the planet as a solid sphere
+        }
 
         glPopMatrix();
     }
@@ -232,6 +286,9 @@ void drawRings()
     glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_LIGHTING_BIT);
     glDisable(GL_TEXTURE_2D); 
     glEnable(GL_NORMALIZE);   
+
+    GLfloat noEmission[] = {0.0f, 0.0f, 0.0f, 1.0f};
+    glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, noEmission);
 
     for (int i = 0; i < NUM_PLANETS; ++i)
     {
@@ -244,14 +301,28 @@ void drawRings()
         // Axial tilt: Saturn (~27°) vs. Uranus (~82°)
         GLfloat tilt = (i == 5) ? 27.0f : 82.0f;
 
-        // slightly lighter version of the planet's color
-        GLfloat c[3] = {
-            planets[i].color[0] * 0.9f + 0.1f,
-            planets[i].color[1] * 0.9f + 0.1f,
-            planets[i].color[2] * 0.9f + 0.1f};
+        GLfloat c[3];
+        GLfloat spec[4];
+
+        if (i == 6) // Uranus: soft icy blue-grey 
+        {
+            c[0] = 0.44f;
+            c[1] = 0.54f;
+            c[2] = 0.62f;
+            spec[0] = 0.12f; spec[1] = 0.14f; spec[2] = 0.16f; spec[3] = 1.0f;
+        }
+        else // Saturn (or any other ringed planet)
+        {
+            c[0] = 0.58f;
+            c[1] = 0.58f;
+            c[2] = 0.60f;
+            spec[0] = 0.10f; spec[1] = 0.10f; spec[2] = 0.10f; spec[3] = 1.0f;
+        }
 
         glColor3fv(c);
         glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, c);
+        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, spec);
+        glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 12.0f);
 
         glPushMatrix();
         glRotatef(planets[i].orbitAngle, 0.0f, 1.0f, 0.0f); // follow the planet's orbit
@@ -293,16 +364,104 @@ void drawStars()
     glPopAttrib();
 }
 
+
+void drawOrbits()
+{
+    glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_LINE_BIT | GL_DEPTH_BUFFER_BIT);
+    glDisable(GL_LIGHTING);
+    glDisable(GL_TEXTURE_2D);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    glLineWidth(1.0f);
+
+    const float pi = 3.14159265f;
+    const int segments = 128;
+
+    for (int i = 0; i < NUM_PLANETS; ++i)
+    {
+        bool isSelected = (selectedBodyIdx == i + 1);
+        float alpha = isSelected ? 0.55f : 0.22f;
+
+        if (isSelected)
+            glColor4f(0.85f, 0.90f, 1.0f, alpha);
+        else
+            glColor4f(0.55f, 0.60f, 0.72f, alpha);
+
+        glBegin(GL_LINE_LOOP);
+        for (int s = 0; s < segments; ++s)
+        {
+            float angle = (2.0f * pi * s) / segments;
+            float x = cosf(angle) * planets[i].orbitRadius;
+            float z = sinf(angle) * planets[i].orbitRadius;
+            glVertex3f(x, 0.0f, z);
+        }
+        glEnd();
+    }
+
+    glPopAttrib();
+}
+
 /* ------------------------------------------------------------
                     Lighting and Texture Loading
 ------------------------------------------------------------*/
 
 void setLighting()
 {
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_NORMALIZE);
+
+    GLfloat sceneAmbient[] = {0.42f, 0.42f, 0.48, 1.0f};
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, sceneAmbient);
+    glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
+
+    GLfloat lightAmbient[] = {0.25f, 0.22f, 0.18f, 1.0f};
+    GLfloat lightDiffuse[] = {1.45f, 1.30f, 1.00f, 1.0f};
+    GLfloat lightSpecular[] = {0.9f, 0.85f, 0.7f, 1.0f};
+
+    glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmbient);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, lightSpecular);
 }
 
 GLuint loadTexture(const char *filename)
 {
+    int width = 0, height = 0, channels = 0;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char *data = stbi_load(filename, &width, &height, &channels, 0);
+
+    if (!data)
+    {
+        cerr << "Failed to load texture: " << filename << stbi_failure_reason()<< endl;
+        return 0;
+    }
+
+    GLenum format = GL_RGB;
+    if (channels == 1)
+        format = GL_RED;
+    else if (channels == 3)
+        format = GL_RGB;
+    else if (channels == 4)
+        format = GL_RGBA;
+
+    GLuint textureID = 0;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); 
+
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, 
+        format, GL_UNSIGNED_BYTE, data);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    stbi_image_free(data);
+    return textureID;
 }
 
 void loadAllTextures()
@@ -316,7 +475,19 @@ void loadAllTextures()
 
 void setPlanetMaterial(GLfloat r, GLfloat g, GLfloat b, GLfloat emission)
 {
+    GLfloat matAmbient[] = {r * 0.25f, g * 0.25f, b * 0.25f, 1.0f};
+    GLfloat matDiffuse[] = {r, g, b, 1.0f};
+    GLfloat matSpecular[] = {0.45f, 0.45f, 0.45f, 1.0f};
+    GLfloat matEmission[] = {emission * r, emission * g, emission * b, 1.0f};
+
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, matAmbient);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, matDiffuse);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, matSpecular);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, matEmission);
+    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 32.0f);
+
 }
+
 
 /* ------------------------------------------------------------
                         2D Text Overlay
@@ -408,14 +579,17 @@ void display()
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     gluLookAt(
-        0.0f, 12.0f, 24.0f,
+        0.0f, 7.5f, 15.0f,
         0.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f);
+    GLfloat lightPos[] = {0.0f, 4.0f, 0.0f, 1.0f};
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
 
     drawSun();
     drawPlanets();
     drawRings();
     drawStars();
+    drawOrbits();
     draw2DTextOverlay();
 
     glutSwapBuffers();
