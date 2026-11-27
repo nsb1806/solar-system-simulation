@@ -9,9 +9,13 @@
     - Radoc, Justine Grace
 */
 
-#define GLEW_STATIC
-#define BUFFER_OFFSET(i) ((void *)(uintptr_t)(i))
-#define STB_IMAGE_IMPLEMENTATION
+/* ------------------------------------------------------------
+                Preprocessor & Library Setup
+------------------------------------------------------------*/
+
+#define GLEW_STATIC // links GLEW
+#define BUFFER_OFFSET(i) ((void *)(uintptr_t)(i)) // converts a byte offset for the VBO
+#define STB_IMAGE_IMPLEMENTATION // compiled the stb_image implementation
 
 #include <iostream>
 #include <cmath>
@@ -25,41 +29,47 @@
 using namespace std;
 
 /* ------------------------------------------------------------
-                Structures and Global Variables
+                        Data Structures
     Structure is used to store the properties of each planet
+    so a single array can hold all planets
 ------------------------------------------------------------*/
 
 struct Planet
 {
-    const char *name;
-    const char *nickname;
-    GLfloat radius;
-    GLfloat orbitRadius;
-    GLfloat orbitAngle;
-    GLfloat spinAngle;
-    GLfloat orbitSpeed;
-    GLfloat spinSpeed;
-    GLfloat color[3];
-    bool hasRings;
-    GLfloat ringInner;
-    GLfloat ringOuter;
-    const char *textureFile;
-    GLuint textureID;
+    const char *name;               // display name
+    const char *nickname;           // planet descriptor
+    GLfloat radius;                 // size of sphere
+    GLfloat orbitRadius;            // distance from sun
+    GLfloat orbitAngle;             // angle around sun
+    GLfloat spinAngle;              // rotation on axis
+    GLfloat orbitSpeed;             // degrees per second around sun
+    GLfloat spinSpeed;              // degrees per second on own axis
+    GLfloat color[3];               // fallback rgb if no texture loads
+    bool hasRings;                  // true for Saturn and Uranus
+    GLfloat ringInner;              // torus inner radius
+    GLfloat ringOuter;              // torus outer radius
+    const char *textureFile;        // file path of texture
+    GLuint textureID;               // openGL handle; 0 = "no texture loaded"
 };
 
 Planet planets[] = {
-    // name,      nickname,           rad,  orbRad, orbAng, spAng, orbSpd, spSpd, color[3],          hasRings, ringI, ringO, textureFile          textID
-    {"MERCURY", "The Swift Planet", 0.22f, 2.2f, 25.0f, 0.0f, 40.0f, 10.0f, {0.65f, 0.62f, 0.58f}, false, 0.0f, 0.0f, "textures/mercury.jpg", 0},
-    {"VENUS", "Earth's Twin", 0.36f, 3.4f, 215.0f, 0.0f, 30.0f, 8.0f, {0.85f, 0.55f, 0.25f}, false, 0.0f, 0.0f, "textures/venus.jpg", 0},
-    {"EARTH", "The Blue Planet", 0.40f, 4.8f, 195.0f, 0.0f, 25.0f, 20.0f, {0.20f, 0.55f, 0.90f}, false, 0.0f, 0.0f, "textures/earth.jpg", 0},
-    {"MARS", "The Red Planet", 0.30f, 6.2f, 45.0f, 0.0f, 20.0f, 18.0f, {0.85f, 0.35f, 0.20f}, false, 0.0f, 0.0f, "textures/mars.jpg", 0},
-    {"JUPITER", "The Gas Giant", 0.85f, 9.2f, 35.0f, 0.0f, 12.0f, 25.0f, {0.82f, 0.62f, 0.42f}, false, 0.0f, 0.0f, "textures/jupiter.jpg", 0},
-    {"SATURN", "The Ringed Planet", 0.70f, 11.8f, 190.0f, 0.0f, 10.0f, 22.0f, {0.85f, 0.72f, 0.48f}, true, 0.95f, 1.45f, "textures/saturn.jpg", 0},
-    {"URANUS", "The Ice Giant", 0.55f, 14.2f, 325.0f, 0.0f, 8.0f, 16.0f, {0.30f, 0.82f, 0.88f}, true, 0.75f, 1.15f, "textures/uranus.jpg", 0},
-    {"NEPTUNE", "The Distant Giant", 0.52f, 16.5f, 95.0f, 0.0f, 6.0f, 14.0f, {0.25f, 0.50f, 0.92f}, false, 0.0f, 0.0f, "textures/neptune.jpg", 0}};
+    // name,      nickname,           rad,  orbRad, orbAng, spAng, orbSpd, spSpd, color[3],          hasRings, ringI, ringO, textureFile        textID
+    {"MERCURY",  "The Swift Planet", 0.22f,  2.2f,  25.0f, 0.0f, 40.0f, 10.0f, {0.65f, 0.62f, 0.58f}, false,  0.0f,  0.0f, "textures/mercury.jpg", 0},
+    {  "VENUS",      "Earth's Twin", 0.36f,  3.4f, 215.0f, 0.0f, 30.0f,  8.0f, {0.85f, 0.55f, 0.25f}, false,  0.0f,  0.0f,   "textures/venus.jpg", 0},
+    {  "EARTH",   "The Blue Planet", 0.40f,  4.8f, 195.0f, 0.0f, 25.0f, 20.0f, {0.20f, 0.55f, 0.90f}, false,  0.0f,  0.0f,   "textures/earth.jpg", 0},
+    {   "MARS",    "The Red Planet", 0.30f,  6.2f,  45.0f, 0.0f, 20.0f, 18.0f, {0.85f, 0.35f, 0.20f}, false,  0.0f,  0.0f,    "textures/mars.jpg", 0},
+    {"JUPITER",     "The Gas Giant", 0.85f,  9.2f,  35.0f, 0.0f, 12.0f, 25.0f, {0.82f, 0.62f, 0.42f}, false,  0.0f,  0.0f, "textures/jupiter.jpg", 0},
+    { "SATURN", "The Ringed Planet", 0.70f, 11.8f, 190.0f, 0.0f, 10.0f, 22.0f, {0.85f, 0.72f, 0.48f},  true, 0.95f, 1.45f,  "textures/saturn.jpg", 0},
+    { "URANUS",     "The Ice Giant", 0.55f, 14.2f, 325.0f, 0.0f,  8.0f, 16.0f, {0.30f, 0.82f, 0.88f},  true, 0.75f, 1.15f,  "textures/uranus.jpg", 0},
+    {"NEPTUNE", "The Distant Giant", 0.52f, 16.5f,  95.0f, 0.0f,  6.0f, 14.0f, {0.25f, 0.50f, 0.92f}, false,  0.0f,  0.0f, "textures/neptune.jpg", 0}};
 
 const int NUM_PLANETS = sizeof(planets) / sizeof(planets[0]);
 
+/* ------------------------------------------------------------
+                    Global Variables
+------------------------------------------------------------*/
+
+// SUN
 const char *sunName = "SUN";
 const char *sunNickname = "The Nearest Star";
 GLfloat sunRadius = 1.4f;
@@ -69,34 +79,78 @@ GLfloat sunColor[3] = {1.0f, 0.75f, 0.15f};
 const char *sunTextureFile = "textures/sun.jpg";
 GLuint sunTextureID = 0;
 
-bool isPaused = false;
-float simSpeed = 1.0f;
+bool isPaused = false; // simulation paused
+float simSpeed = 1.0f; // multiplier for speed
 int selectedBodyIdx = -1; // -1 none, 0 SUN, 1..8 planets[0..7]
 
 // Store the current window dimensions for the 2D overlay and reshape function.
 int windowWidth = 800;
 int windowHeight = 600;
 
-// --- Star VBO data ---
-const int NUM_STARS = 1500;
+/* ------------------------------------------------------------
+                        VBO DATA 
+------------------------------------------------------------ */
+
+// Stars VBO Data
+const int NUM_STARS = 750;
 GLuint starVBO = 0;
+
+// Asteroid Belt VBO Data
+const int NUM_ASTEROIDS = 1200;
+GLuint asteroidVBO = 0;
+float asteroidBeltAngle = 0.0f;
+
+/* ------------------------------------------------------------
+                        Orbit-camera state 
+                    (Additional Added Feature)
+------------------------------------------------------------ */
+
+/*
+    The camera is stored in spherical coordinates around the origin.
+    camYaw   : horizontal orbit angle
+    camPitch : vertical elevation
+    camDistance : radius from the Sun
+    The eye position is recomputed every frame from these values.
+*/
+
+float camYaw      = 40.0f;
+float camPitch    = 30.0f;
+float camDistance = 35.0f;
+float camTargetX  = 0.0f;
+float camTargetY  = 0.0f;
+float camTargetZ  = 0.0f;
+
+bool  mouseDragging = false; // true while left mouse button is held
+int   lastMouseX = 0;
+int   lastMouseY = 0;
+
 /* ------------------------------------------------------------
                     Function Prototypes
 ------------------------------------------------------------*/
 
+// GLUT callbacks
 void init();
 void display();
 void reshape(int width, int height);
 void timer(int value);
 void keyboard(unsigned char key, int x, int y);
 void mouse(int button, int state, int x, int y);
+void motion(int x, int y);
+void mouseWheel(int wheel, int direction, int x, int y);
 
+// Setup
 void setLighting();
 void initStarVBO();
+void initAsteroidVBO();
+void drawAsteroidBelt();
 void resetSimulation();
+void resetCamera();
 
+// Drawing helpers
 void setPlanetMaterial(GLfloat r, GLfloat g, GLfloat b, GLfloat emission = 0.0f);
 void drawTexturedSphere(GLdouble radius, int slices, int stacks);
+
+// Scene drawing
 void drawSun();
 void drawPlanets();
 void drawRings();
@@ -105,15 +159,17 @@ void drawOrbits();
 void drawBitmapText(float x, float y, const char *text);
 void draw2DTextOverlay();
 
+// textures
 GLuint loadTexture(const char *filename);
 void loadAllTextures();
 
 /* ------------------------------------------------------------
                         Main Function
+    Initializes GLUT and GLEW, creates window, calls init(),
+    registers every callback and enters GLUT event loop
 ------------------------------------------------------------*/
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(800, 600);
@@ -121,8 +177,7 @@ int main(int argc, char **argv)
     glutCreateWindow("Group 8 - Solar System Simulation");
 
     GLenum err = glewInit();
-    if (err != GLEW_OK)
-    {
+    if (err != GLEW_OK) {
         cerr << "GLEW initialization failed!" << endl;
         return 1;
     }
@@ -133,6 +188,9 @@ int main(int argc, char **argv)
     glutDisplayFunc(display);
     glutKeyboardFunc(keyboard);
     glutMouseFunc(mouse);
+    glutMotionFunc(motion);
+    glutPassiveMotionFunc(motion);
+    glutMouseWheelFunc(mouseWheel);
     glutReshapeFunc(reshape);
     glutTimerFunc(16, timer, 0);
 
@@ -144,8 +202,7 @@ int main(int argc, char **argv)
                     Initialization
 ------------------------------------------------------------*/
 
-void init()
-{
+void init() {
     glClearColor(0.02f, 0.02f, 0.05f, 1.0f);
     glEnable(GL_DEPTH_TEST);
     glShadeModel(GL_SMOOTH);
@@ -153,24 +210,24 @@ void init()
     setLighting();
     loadAllTextures();
     initStarVBO();
+    initAsteroidVBO();
     resetSimulation();
+    resetCamera();
 
     reshape(800, 600);
 }
 
 // Generates random star positions and colors, uploads them to a GPU buffer
-void initStarVBO()
-{
+void initStarVBO() {
+
     // Array storing 6 floats per star: x, y, z, r, g, b
     GLfloat data[NUM_STARS * 6];
 
-    for (int i = 0; i < NUM_STARS; ++i)
-    {
+    for (int i = 0; i < NUM_STARS; ++i) {
         float x, y, z, distSq;
 
         // Pick random points in a big box until one lands 50-70 units from the center
-        do
-        {
+        do {
             x = (rand() % 1401 - 700) / 10.0f; // -70.0 to 70.0
             y = (rand() % 1401 - 700) / 10.0f;
             z = (rand() % 1401 - 700) / 10.0f;
@@ -196,11 +253,46 @@ void initStarVBO()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
+
+void initAsteroidVBO() {
+
+    // Each asteroid = 3 floats (x, y, z) + 3 floats (r, g, b) = 6 floats
+    GLfloat data[NUM_ASTEROIDS * 6];
+
+    for (int i = 0; i < NUM_ASTEROIDS; ++i) {
+
+        // Place between Mars and Jupiter
+        // Small radial spread so the belt looks thick
+        float radius = 7.0f + (rand() % 100) / 50.0f; 
+
+        // Random angle around the Sun
+        float angle = ((rand() % 360) + (rand() % 100) / 100.0f) * 3.14159265f / 180.0f; 
+        // Small vertical jitter 
+        float y = ((rand() % 200) - 100) / 200.0f; 
+
+        data[i*6 + 0] = cosf(angle) * radius;
+        data[i*6 + 1] = y;
+        data[i*6 + 2] = sinf(angle) * radius;
+
+        // Slight grey variation per asteroid
+        float shade = 0.45f + (rand() % 40) / 100.0f;
+        data[i*6 + 3] = shade;
+        data[i*6 + 4] = shade * 0.95f;
+        data[i*6 + 5] = shade * 0.85f;
+    }
+
+    glGenBuffers(1, &asteroidVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, asteroidVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(data), data, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
 /* ------------------------------------------------------------
-                    Object Drawing Functions
+                    Object Drawing Helpers
 ------------------------------------------------------------*/
-void drawTexturedSphere(GLdouble radius, int slices, int stacks) 
-{ 
+
+// Draws UV-mapped sphere and enabling gluQuadricTexture for texture coordinates
+void drawTexturedSphere(GLdouble radius, int slices, int stacks) { 
     GLUquadric *quad = gluNewQuadric(); 
     gluQuadricTexture(quad, GL_TRUE); 
     gluQuadricNormals(quad, GLU_SMOOTH); 
@@ -208,50 +300,51 @@ void drawTexturedSphere(GLdouble radius, int slices, int stacks)
     gluDeleteQuadric(quad); 
 }
 
-    void drawSun()
-{
+/* ------------------------------------------------------------
+                    Object Drawing Functions
+------------------------------------------------------------*/
+
+    void drawSun() {
 
     GLfloat glowIntensity = (selectedBodyIdx == 0) ? 1.35f : 0.95f; // Sun emits light when selected
     glPushMatrix();
     glRotatef(sunSpinAngle, 0.0f, 1.0f, 0.0f); // Spin the sun around its axis
 
-if (sunTextureID != 0)
-    {
-        setPlanetMaterial(1.0f, 0.90f, 0.65f, 0.35f * glowIntensity); // Sun emits light when selected
-        
-        GLfloat sunEmission[] = {
-            1.0f * glowIntensity, 
-            0.78f * glowIntensity, 
-            0.22f * glowIntensity, 
-            1.0f
-        };
-        glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, sunEmission);
-        
-        glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, sunTextureID);
-        glColor3f(1.0f, 1.0f, 1.0f);  // Set the sun's color
-        drawTexturedSphere(sunRadius, 40, 40);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glDisable(GL_TEXTURE_2D);
+    if (sunTextureID != 0) {
+            setPlanetMaterial(1.0f, 0.90f, 0.65f, 0.35f * glowIntensity); // Sun emits light when selected
+            
+            GLfloat sunEmission[] = {
+                1.0f * glowIntensity, 
+                0.78f * glowIntensity, 
+                0.22f * glowIntensity, 
+                1.0f
+            };
 
-        GLfloat noEmission[] = {0.0f, 0.0f, 0.0f, 1.0f};
-        glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, noEmission); // Reset emission
-    }
-    else
-    {
-        setPlanetMaterial(sunColor[0], sunColor[1], sunColor[2], glowIntensity * 0.35f); // Sun emits light when selected
-        glColor3fv(sunColor);  // Set the sun's color
-        glutSolidSphere(sunRadius, 40, 40); // Draw the sun as a solid sphere
-    }       
+            glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, sunEmission);
+            
+            glEnable(GL_TEXTURE_2D);
+            glBindTexture(GL_TEXTURE_2D, sunTextureID);
+            glColor3f(1.0f, 1.0f, 1.0f);  // Set the sun's color
+            drawTexturedSphere(sunRadius, 40, 40);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glDisable(GL_TEXTURE_2D);
+
+            GLfloat noEmission[] = {0.0f, 0.0f, 0.0f, 1.0f};
+            glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, noEmission); // Reset emission
+        }
+        else
+        {
+            setPlanetMaterial(sunColor[0], sunColor[1], sunColor[2], glowIntensity * 0.35f); // Sun emits light when selected
+            glColor3fv(sunColor);  // Set the sun's color
+            glutSolidSphere(sunRadius, 40, 40); // Draw the sun as a solid sphere
+        }       
 
     glPopMatrix();
 }
 
-void drawPlanets()
-{
+void drawPlanets() {
 
-    for (int i = 0; i < NUM_PLANETS; ++i)
-    {
+    for (int i = 0; i < NUM_PLANETS; ++i) {
         glPushMatrix();
 
         glRotatef(planets[i].orbitAngle, 0.0f, 1.0f, 0.0f); // Rotate the planet around the sun based on its orbit angle
@@ -260,8 +353,7 @@ void drawPlanets()
 
         GLfloat glow = (selectedBodyIdx == i + 1) ? 0.55f : 0.0f; // Glow effect when selected
 
-        if (planets[i].textureID != 0)
-        {
+        if (planets[i].textureID != 0) {
             setPlanetMaterial(1.0f, 1.0f, 1.0f, glow);
             glEnable(GL_TEXTURE_2D);
             glBindTexture(GL_TEXTURE_2D, planets[i].textureID);
@@ -270,8 +362,7 @@ void drawPlanets()
             glBindTexture(GL_TEXTURE_2D, 0);
             glDisable(GL_TEXTURE_2D);
         }
-        else
-        {
+        else {
             setPlanetMaterial(planets[i].color[0], planets[i].color[1], planets[i].color[2], glow);
             glColor3fv(planets[i].color);               // Set the planet's color
             glutSolidSphere(planets[i].radius, 32, 32); // Draw the planet as a solid sphere
@@ -281,8 +372,8 @@ void drawPlanets()
     }
 }
 
-void drawRings()
-{
+void drawRings() {
+
     glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_LIGHTING_BIT);
     glDisable(GL_TEXTURE_2D); 
     glEnable(GL_NORMALIZE);   
@@ -290,10 +381,10 @@ void drawRings()
     GLfloat noEmission[] = {0.0f, 0.0f, 0.0f, 1.0f};
     glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, noEmission);
 
-    for (int i = 0; i < NUM_PLANETS; ++i)
-    {
+    for (int i = 0; i < NUM_PLANETS; ++i) {
         if (!planets[i].hasRings)
             continue;
+
         // Ring's thickness and middle radius converted from its inner and outer edges
         GLfloat tubeRadius = (planets[i].ringOuter - planets[i].ringInner) / 2.0f;
         GLfloat ringRadius = (planets[i].ringOuter + planets[i].ringInner) / 2.0f;
@@ -304,15 +395,13 @@ void drawRings()
         GLfloat c[3];
         GLfloat spec[4];
 
-        if (i == 6) // Uranus: soft icy blue-grey 
-        {
+        if (i == 6) { // Uranus: soft icy blue-grey
             c[0] = 0.44f;
             c[1] = 0.54f;
             c[2] = 0.62f;
             spec[0] = 0.12f; spec[1] = 0.14f; spec[2] = 0.16f; spec[3] = 1.0f;
         }
-        else // Saturn (or any other ringed planet)
-        {
+        else { // Saturn (or any other ringed planet)
             c[0] = 0.58f;
             c[1] = 0.58f;
             c[2] = 0.60f;
@@ -338,8 +427,7 @@ void drawRings()
     glPopAttrib();
 }
 
-void drawStars()
-{
+void drawStars() {
     glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_POINT_BIT);
     glDisable(GL_LIGHTING);   // Disabled because stars shine on their own
     glDisable(GL_TEXTURE_2D);
@@ -364,9 +452,7 @@ void drawStars()
     glPopAttrib();
 }
 
-
-void drawOrbits()
-{
+void drawOrbits() {
     glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_LINE_BIT | GL_DEPTH_BUFFER_BIT);
     glDisable(GL_LIGHTING);
     glDisable(GL_TEXTURE_2D);
@@ -378,8 +464,7 @@ void drawOrbits()
     const float pi = 3.14159265f;
     const int segments = 128;
 
-    for (int i = 0; i < NUM_PLANETS; ++i)
-    {
+    for (int i = 0; i < NUM_PLANETS; ++i) {
         bool isSelected = (selectedBodyIdx == i + 1);
         float alpha = isSelected ? 0.55f : 0.22f;
 
@@ -402,12 +487,39 @@ void drawOrbits()
     glPopAttrib();
 }
 
+void drawAsteroidBelt() {
+    if (asteroidVBO == 0) return;
+
+    glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_POINT_BIT);
+
+    glDisable(GL_LIGHTING);       // asteroids are self-lit points
+    glDisable(GL_TEXTURE_2D);
+    glPointSize(2.5f);
+
+    glBindBuffer(GL_ARRAY_BUFFER, asteroidVBO);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_COLOR_ARRAY);
+
+    GLsizei stride = 6 * sizeof(GLfloat);
+    glVertexPointer(3, GL_FLOAT, stride, BUFFER_OFFSET(0));
+    glColorPointer (3, GL_FLOAT, stride, BUFFER_OFFSET(3 * sizeof(GLfloat)));
+
+    glPushMatrix();
+        glRotatef(asteroidBeltAngle, 0.0f, 1.0f, 0.0f);
+        glDrawArrays(GL_POINTS, 0, NUM_ASTEROIDS);
+    glPopMatrix();
+    glDisableClientState(GL_COLOR_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glPopAttrib();
+}
+
 /* ------------------------------------------------------------
                     Lighting and Texture Loading
 ------------------------------------------------------------*/
 
-void setLighting()
-{
+void setLighting() {
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
     glEnable(GL_NORMALIZE);
@@ -425,8 +537,7 @@ void setLighting()
     glLightfv(GL_LIGHT0, GL_SPECULAR, lightSpecular);
 }
 
-GLuint loadTexture(const char *filename)
-{
+GLuint loadTexture(const char *filename) {
     int width = 0, height = 0, channels = 0;
     stbi_set_flip_vertically_on_load(true);
     unsigned char *data = stbi_load(filename, &width, &height, &channels, 0);
@@ -464,17 +575,14 @@ GLuint loadTexture(const char *filename)
     return textureID;
 }
 
-void loadAllTextures()
-{
+void loadAllTextures() {
     sunTextureID = loadTexture(sunTextureFile);
-    for (int i = 0; i < NUM_PLANETS; ++i)
-    {
+    for (int i = 0; i < NUM_PLANETS; ++i) {
         planets[i].textureID = loadTexture(planets[i].textureFile);
     }
 }
 
-void setPlanetMaterial(GLfloat r, GLfloat g, GLfloat b, GLfloat emission)
-{
+void setPlanetMaterial(GLfloat r, GLfloat g, GLfloat b, GLfloat emission) {
     GLfloat matAmbient[] = {r * 0.25f, g * 0.25f, b * 0.25f, 1.0f};
     GLfloat matDiffuse[] = {r, g, b, 1.0f};
     GLfloat matSpecular[] = {0.45f, 0.45f, 0.45f, 1.0f};
@@ -492,15 +600,13 @@ void setPlanetMaterial(GLfloat r, GLfloat g, GLfloat b, GLfloat emission)
 /* ------------------------------------------------------------
                         2D Text Overlay
 ------------------------------------------------------------*/
-void drawBitmapText(float x, float y, const char *text)
-{
+void drawBitmapText(float x, float y, const char *text) {
     glRasterPos2f(x, y);
     for (const char *character = text; *character != '\0'; ++character)
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *character);
 }
 
-void draw2DTextOverlay()
-{
+void draw2DTextOverlay() {
     // Save the 3D rendering state before switching to screen-space drawing.
     glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_CURRENT_BIT);
     glDisable(GL_DEPTH_TEST);
@@ -520,13 +626,11 @@ void draw2DTextOverlay()
     const char *selectedName = "None";
     const char *selectedNickname = "Press 1-9 to select a body";
 
-    if (selectedBodyIdx == 0)
-    {
+    if (selectedBodyIdx == 0) {
         selectedName = sunName;
         selectedNickname = sunNickname;
     }
-    else if (selectedBodyIdx > 0 && selectedBodyIdx <= NUM_PLANETS)
-    {
+    else if (selectedBodyIdx > 0 && selectedBodyIdx <= NUM_PLANETS) {
         selectedName = planets[selectedBodyIdx - 1].name;
         selectedNickname = planets[selectedBodyIdx - 1].nickname;
     }
@@ -572,22 +676,31 @@ void draw2DTextOverlay()
 /* ------------------------------------------------------------
                         Display Callback
 ------------------------------------------------------------*/
-void display()
-{
+void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    gluLookAt(
-        0.0f, 7.5f, 15.0f,
-        0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f);
+
+    // Spherical - Cartesian eye positionm
+    float yawRad   = camYaw   * (float)M_PI / 180.0f;
+    float pitchRad = camPitch * (float)M_PI / 180.0f;
+    float eyeX = camTargetX + camDistance * cos(pitchRad) * sin(yawRad);
+    float eyeY = camTargetY + camDistance * sin(pitchRad);
+    float eyeZ = camTargetZ + camDistance * cos(pitchRad) * cos(yawRad);
+
+    gluLookAt(eyeX, eyeY, eyeZ,
+            camTargetX, camTargetY, camTargetZ,
+            0.0, 1.0, 0.0);
+
+    // Light source at the sun
     GLfloat lightPos[] = {0.0f, 4.0f, 0.0f, 1.0f};
     glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
 
     drawSun();
     drawPlanets();
     drawRings();
+    drawAsteroidBelt();
     drawStars();
     drawOrbits();
     draw2DTextOverlay();
@@ -598,8 +711,8 @@ void display()
 /* ------------------------------------------------------------
                 Window Reshape and Timer
 ------------------------------------------------------------*/
-void reshape(int width, int height)
-{
+void reshape(int width, int height) {
+
     // Update the viewport and perspective projection whenever the window is
     // resized, preventing the solar system from being stretched.
     windowWidth = (width > 0) ? width : 1;
@@ -616,14 +729,12 @@ void reshape(int width, int height)
     glLoadIdentity();
 }
 
-void timer(int value)
-{
+void timer(int value) {
 
-    if (!isPaused)
-    {
+    if (!isPaused) {
+
         // Advance each planet's orbit and spin.
-        for (int i = 0; i < NUM_PLANETS; ++i)
-        {
+        for (int i = 0; i < NUM_PLANETS; ++i) {
             planets[i].orbitAngle += planets[i].orbitSpeed * 0.016f * simSpeed;
             planets[i].spinAngle += planets[i].spinSpeed * 0.016f * simSpeed;
 
@@ -635,10 +746,13 @@ void timer(int value)
                 planets[i].spinAngle -= 360.0f;
         }
 
-        // Advance the Sun's spin.
         sunSpinAngle += sunSpinSpeed * 0.016f * simSpeed;
         if (sunSpinAngle >= 360.0f)
             sunSpinAngle -= 360.0f;
+
+        asteroidBeltAngle += 2.0f * 0.016f * simSpeed;   // ~2°/sec
+        if (asteroidBeltAngle >= 360.0f) asteroidBeltAngle -= 360.0f;
+
     }
 
     glutPostRedisplay();         // Request a redraw of the window
@@ -654,8 +768,7 @@ void keyboard(unsigned char key, int x, int y)
     (void)y;
 
     // Handle simulation controls and body selection from keyboard input.
-    switch (key)
-    {
+    switch (key) {
     case ' ':
         isPaused = !isPaused;
         break;
@@ -663,12 +776,12 @@ void keyboard(unsigned char key, int x, int y)
     case 'r':
     case 'R':
         resetSimulation();
+        resetCamera();
         break;
 
     case '1':
         selectedBodyIdx = 0; // Sun
         break;
-
     case '2':
     case '3':
     case '4':
@@ -691,28 +804,92 @@ void keyboard(unsigned char key, int x, int y)
     glutPostRedisplay();
 }
 
+
 /* ------------------------------------------------------------
-                        Mouse Callback
+                Mouse callbacks 
 ------------------------------------------------------------*/
-void mouse(int button, int state, int x, int y)
-{
+void mouse(int button, int state, int x, int y) {
+    if (state == GLUT_DOWN) {
+        if (button == GLUT_LEFT_BUTTON) {
+
+            // Begin orbit-drag
+            mouseDragging = true;
+            lastMouseX = x;
+            lastMouseY = y;
+        }
+        else if (button == GLUT_RIGHT_BUTTON) {
+
+            // Right-click speeds up
+            simSpeed = (simSpeed < 5.0f) ? simSpeed + 0.2f : 5.0f;
+        }
+    }
+    else if (state == GLUT_UP) {
+        if (button == GLUT_LEFT_BUTTON) {
+            mouseDragging = false;
+            
+            // Left-click without drag = slow down
+            if (abs(x - lastMouseX) < 3 && abs(y - lastMouseY) < 3) {
+                simSpeed = (simSpeed > 0.2f) ? simSpeed - 0.2f : 0.2f;
+            }
+        }
+    }
+    glutPostRedisplay();
+}
+
+void motion(int x, int y) {
+    if (!mouseDragging) return;
+
+    int dx = x - lastMouseX;
+    int dy = y - lastMouseY;
+
+    camYaw   += dx * 0.4f;
+    camPitch -= dy * 0.4f;
+
+    if (camPitch >  85.0f) camPitch =  85.0f;
+    if (camPitch < -85.0f) camPitch = -85.0f;
+
+    lastMouseX = x;
+    lastMouseY = y;
+
+    glutPostRedisplay();
+}
+
+void mouseWheel(int wheel, int direction, int x, int y) {
+    (void)wheel; (void)x; (void)y;
+
+    camDistance -= direction * 1.5f;
+    if (camDistance <  8.0f) camDistance =  8.0f;
+    if (camDistance > 90.0f) camDistance = 90.0f;
+
+    glutPostRedisplay();
 }
 
 /* ------------------------------------------------------------
                         Reset Simulation
 ------------------------------------------------------------*/
-void resetSimulation()
-{
+void resetSimulation() {
 
-    // Return every planet's orbit and spin to zero degrees.
-    for (int i = 0; i < NUM_PLANETS; ++i)
-    {
-        planets[i].orbitAngle = 0.0f;
-        planets[i].spinAngle = 0.0f;
+    GLfloat startAngles[NUM_PLANETS] = {
+            25.0f, 215.0f, 195.0f, 45.0f, 35.0f, 190.0f, 325.0f, 95.0f
+        };
+
+    for (int i = 0; i < NUM_PLANETS; ++i) {
+        planets[i].orbitAngle = startAngles[i];
+        planets[i].spinAngle  = 0.0f;
     }
 
     sunSpinAngle = 0.0f; // Reset the Sun's spin angle to zero degrees.
+    asteroidBeltAngle = 0.0f;
     isPaused = false;    // Make sure the simulation is not paused.
     simSpeed = 1.0f;     // Reset the simulation speed to normal.
     selectedBodyIdx = -1;
+}
+
+void resetCamera() {
+    camYaw      = 40.0f;
+    camPitch    = 30.0f;
+    camDistance = 35.0f;
+    camTargetX  = 0.0f;
+    camTargetY  = 0.0f;
+    camTargetZ  = 0.0f;
 }
