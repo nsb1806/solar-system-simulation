@@ -1,66 +1,92 @@
-# G8 CS0045 Final Project: Solar System Simulation
+# 🌌 Group 8: 3D Solar System Simulation
 
-An interactive 3D Solar System Simulation built in C++ using OpenGL
+An interactive 3D Solar System Simulation built in C++ using OpenGL, GLUT, and GLEW.
+
+This project was developed as the final requirement for the **CS0045** course. It features real-time planetary revolution and rotation, texture mapping, dynamic lighting, a background starfield, and interactive camera controls.
 
 ---
 
-## Features
+## 🚀 Features
 
-### GEOMETRIC PRIMITIVES/OBJECTS:
+### Geometric Primitives & Objects
 
-- Spheres (Sun and Planets)
-- Torus (Saturn and Uranus Rings)
-- Points (Stars)
-- Asteroid Belt \*Additional (if possible)
+- **Spheres:** The Sun and all eight planets.
+- **Torus:** 3D rings for Saturn and Uranus.
+- **Points:** A background starfield.
+- **Bonus Feature:** A 1,200-particle Asteroid Belt orbiting between Mars and Jupiter.
 
-### KEYBOARD CALLBACK:
+### Keyboard Callbacks
 
-- Press Space to pause/resume the simulation.
-- Press "r" to reset the simulation to its initial state.
-- Press 1-9 to view names of Sun and Planets and their nicknames and make them glow to stand out.
+- **Space:** Pause / Resume the simulation.
+- **R:** Reset the simulation (returns planets to their starting positions and resets the camera).
+- **1 to 9:** Select the Sun or a specific planet to view its name, nickname, and trigger a self-glow (emission) effect.
+  - _1: SUN — "The Nearest Star"_
+  - _2: MERCURY — "The Swift Planet"_
+  - _3: VENUS — "Earth's Twin"_
+  - _4: EARTH — "The Blue Planet"_
+  - _5: MARS — "The Red Planet"_
+  - _6: JUPITER — "The Gas Giant"_
+  - _7: SATURN — "The Ringed Planet"_
+  - _8: URANUS — "The Ice Giant"_
+  - _9: NEPTUNE — "The Distant Giant"_
 
-  _[1 == SUN; "The Nearest Star", 2 == MERCURY; "The Swift Planet", 3 == VENUS; "Earth's Twin", 4 == EARTH; "The Blue Planet", 5 == MARS; "The Red Planet", 6 == JUPITER; "The Gas Giant", 7 == SATURN; "The Ringed Planet", 8 == URANUS; "The Ice Giant", 9 == NEPTUNE; "The Distant Giant"]_
+### Mouse Callbacks
 
-### MOUSE CALLBACK:
+- **Left-Click:** Slow down the simulation speed.
+- **Right-Click:** Speed up the simulation speed.
+- **Click & Drag:** Orbit the camera around the solar system.
+- **Scroll Wheel:** Zoom the camera in and out.
 
-- Click Left Button to slow down the simulation speed.
-- Click Right Button to speed up the simulation speed.
+### 2D Elements
 
-### 2D ELEMENTS:
+- **Bitmap Text Overlay:** Displays the selected body's name, nickname, simulation status (Paused/Running), and current speed multiplier in the bottom-right corner.
 
-- Bitmap Text (Names and Nicknames of Sun and Planets) on Bottom Right corner of the screen.
+### 3D Elements & Transformations
 
-### 3D ELEMENTS:
-
-- Spheres (Sun and Planets)
-- Torus (Saturn and Uranus Rings)
-- Points (Stars) on the background of the simulation.
-
-### TRANSLATION, ROTATION, SCALING:
-
-- **Translation:** Planets revolve around the Sun in their respective orbits.
+- **Translation:** Planets revolve around the Sun along their respective orbital paths.
 - **Rotation:** Planets spin on their own axes.
-- **Scaling:** Planets are scaled to their respective sizes.
+- **Scaling:** Planets and the Sun are scaled to their respective sizes.
 
-### LIGHTING:
+### Lighting
 
-- **Ambient Light:** Simulates the general background light in the scene so the shadowed sides are not pitch black.
-- **Diffuse Light:** Simulates light coming from a light source (Sun) that illuminates surfaces based on their angle to the light.
-- **Specular Light:** Simulates the shiny highlights on surfaces in the scene.
-- **Emission:** Simulates the light given by an object itself (such as the Sun's self-glow and the selected body during keyboard callback), independent of external light sources.
+- **Ambient Light:** General background light so shadowed sides are not pitch black.
+- **Diffuse Light:** Simulates sunlight illuminating surfaces based on their angle to the light source.
+- **Specular Light:** Adds shiny highlights to the planets.
+- **Emission:** Simulates self-glow (applied to the Sun and the currently selected body).
 
-### TEXTURE MAPPING (image):
+### Texture Mapping
 
-- Sun: Sun texture image
-- Mercury: Mercury texture image
-- Venus: Venus texture image
-- Earth: Earth texture image
-- Mars: Mars texture image
-- Jupiter: Jupiter texture image
-- Saturn: Saturn texture image
-- Uranus: Uranus texture image
-- Neptune: Neptune texture image
+High-resolution, equirectangular image textures are mapped onto the spheres for the Sun and all eight planets, providing realistic surface details.
 
-### VBO IMPLEMENTATION:
+### VBO (Vertex Buffer Object) Implementation
 
-- Points (Stars)
+- **Stars & Asteroids:** To optimize performance, the background stars and the asteroid belt are rendered using VBOs (`glDrawArrays(GL_POINTS)`), ensuring fast GPU rendering without overloading the CPU.
+
+---
+
+## 🛠️ How to Run
+
+1. **Prerequisites:** Ensure you have a C++ compiler installed (e.g., MinGW/GCC or MSVC) along with GLEW, GLUT/FreeGLUT, and OpenGL libraries.
+2. **Textures:** Ensure the `textures/` folder containing the `.jpg` images for the Sun and all 8 planets is in the same directory as the executable.
+3. **Compile & Run:** Build the `G8finalproject.cpp` file and run the executable.
+   _(Note: Make sure your IDE's working directory is set to the project folder so the texture paths load correctly)._
+
+---
+
+## 👥 Group 8 Members
+
+- **Bumatay** - Keyboard Callbacks, 2D Overlay, Resize Logic
+- **Butaslac** - Lighting, Texture Mapping, Code Debugging & Finalization
+- **Ferrer** - Mouse Controls, Camera System
+- **Munsayac** - Star VBOs, Asteroid Belt, Torus Rings, Slides
+- **Radoc** - Planets & Sun Drawing, Animation Timer
+
+---
+
+## 📚 Technologies Used
+
+- **C++**
+- **OpenGL** (Legacy Pipeline)
+- **GLEW** (OpenGL Extension Wrangler)
+- **FreeGLUT** (OpenGL Utility Toolkit)
+- **stb_image** (Image loading library)
